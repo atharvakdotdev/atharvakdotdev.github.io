@@ -1,24 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <style>
-        .body{
-            width: 100%;
-            height: 100vh;
-            background: linear-gradient(
-  135deg,
-  #070B14 0%,
-  #0B1733 45%,
-  #172B5C 75%,
-  #241A4F 100%
-);
-        }
-    </style>
+    <!-- Core Stylesheet -->
+    <link rel="stylesheet" href="terminal.css-main/index.css" />
+    <!-- Optional. Only for toast, FAQ component -->
+    <script src="terminal.css-main/index.js"></script>
+    <link rel="stylesheet" href="terminal.css-main/themes/ayu-dark.css" />
 </head>
+
 <body class="body">
-    
+    <div id="terminal" style="margin-left: 20%; margin-top: 10px;">
+        <div id="output_div"></div>
+        <div class="control" style="border: 0px;"  id="input_div">
+            <span class="has-text-primary" style="padding: 0 8px" id="input_pretext">atharvak@dev$</span>
+            <input type="text" class="input" style="caret-color: #8be9fd; caret-shape: block;" id="input"/>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById("terminal");
+        const outputDiv = document.getElementById("output_div");
+
+        function runCommand(command) {
+            const commandOutput = document.createElement("div");
+            const commandLine = document.createElement("div");
+            commandLine.className = "control";
+            commandLine.style.border = "0px";
+
+            const prompt = document.createElement("span");
+            prompt.className = "has-text-primary";
+            prompt.style.padding = "0 8px";
+            prompt.textContent = "atharvak@dev$";
+
+            const enteredCommand = document.createElement("span");
+            enteredCommand.className = "input";
+            enteredCommand.textContent = command;
+
+            commandLine.append(prompt, enteredCommand);
+            commandOutput.appendChild(commandLine);
+
+            const result = document.createElement("p");
+            result.className = "subtitle is-6 mb-3";
+            result.style.margin = "0 11px";
+
+            if (command.trim().toLowerCase() === "whoami") {
+                result.textContent = "Atharva Dixit";}
+
+            if (command.trim().toLowerCase() === "Hostname -I") {
+                result.textContent = "Solapur, Maharashtra, India";
+                
+            } else {
+                result.textContent = `Command not found: ${command}`;
+            }
+
+            commandOutput.appendChild(result);
+            outputDiv.appendChild(commandOutput);
+        }
+
+        terminal.addEventListener("keydown", (event) => {
+            if (event.target.id === "input" && event.key === "Enter") {
+                event.preventDefault();
+                const command = event.target.value;
+                if (!command.trim()) return;
+
+                runCommand(command);
+
+                const currentInputDiv = event.target.closest("#input_div");
+                const nextInputDiv = currentInputDiv.cloneNode(true);
+                nextInputDiv.querySelector("input").value = "";
+                currentInputDiv.replaceWith(nextInputDiv);
+                nextInputDiv.querySelector("input").focus();
+            }
+        });
+    </script>
 </body>
+
 </html>
