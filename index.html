@@ -10,25 +10,110 @@
     <!-- Optional. Only for toast, FAQ component -->
     <script src="terminal.css-main/index.js"></script>
     <link rel="stylesheet" href="terminal.css-main/themes/ayu-dark.css" />
+    <style>
+        body {
+            display: flex;
+            padding-left: 10px;
+            padding-right: 10px;
+
+            /* 1. Default for Mobile: Stack items vertically */
+            flex-direction: column;
+            gap: 10px;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        /* 2. Responsive adjustment for Tablets & Desktops */
+        @media (min-width: 768px) {
+            body {
+                /* Flips to side-by-side layout when the screen is wide enough */
+                flex-direction: row;
+            }
+        }
+
+        .terminal {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            padding-top: 4px;
+            padding-left: 1px;
+
+            border-color: #8be9fd;
+            border-style: solid;
+            border-width: 2px;
+            border-radius: 1cap;
+            flex: 1;
+        }
+
+        #output_div {
+            margin-bottom: 0 !important;
+            padding-top: 0px !important;
+            padding-bottom: 0px;
+        }
+
+        #input_div {
+            padding-top: 0px;
+            padding-bottom: 0px;
+        }
+        #terminal_sidebar {
+            max-width: 25%;
+        }
+    </style>
 </head>
 
 <body class="body">
-    <div id="terminal" style="margin-left: 20%; margin-top: 10px;">
+<div id="terminal_sidebar" class="terminal">
         <div id="output_div"></div>
-        <div class="control" style="border: 0px;"  id="input_div">
+        <div class="control" style="border: 0px;" id="input_div">
             <span class="has-text-primary" style="padding: 0 8px" id="input_pretext">atharvak@dev$</span>
-            <input type="text" class="input" style="caret-color: #8be9fd; caret-shape: block;" id="input"/>
+            <input type="text" class="input" style="caret-color: #8be9fd; caret-shape: block;" id="input" />
         </div>
     </div>
+    <div id="terminal" class="terminal">
+        <div id="output_div"></div>
+        <div class="control" style="border: 0px;" id="input_div">
+            <span class="has-text-primary" style="padding: 0 8px" id="input_pretext">atharvak@dev$</span>
+            <input type="text" class="input" style="caret-color: #8be9fd; caret-shape: block;" id="input" />
+        </div>
+    </div>
+    
 
     <script>
+
+
         const terminal = document.getElementById("terminal");
         const outputDiv = document.getElementById("output_div");
+        const commandHandlers = {
+            "whoami": () => "Atharva Dixit",
+            "hostname -i": () => "Solapur, Maharashtra, India"
+        };
+
+        function createTextOutput(text) {
+            const output = document.createElement("p");
+            output.className = "subtitle is-6 mb-3";
+            output.style.margin = "0 11px";
+            output.textContent = text;
+            return output;
+        }
+
+        function renderCommandResult(container, result) {
+            if (result == null) return;
+
+            const outputs = Array.isArray(result) ? result : [result];
+            outputs.forEach((output) => {
+                if (typeof output === "string") {
+                    container.appendChild(createTextOutput(output));
+                } else if (output instanceof Node) {
+                    container.appendChild(output);
+                }
+            });
+        }
 
         function runCommand(command) {
             const commandOutput = document.createElement("div");
             const commandLine = document.createElement("div");
             commandLine.className = "control";
+            commandLine.id = "input_div";
+
             commandLine.style.border = "0px";
 
             const prompt = document.createElement("span");
@@ -43,21 +128,12 @@
             commandLine.append(prompt, enteredCommand);
             commandOutput.appendChild(commandLine);
 
-            const result = document.createElement("p");
-            result.className = "subtitle is-6 mb-3";
-            result.style.margin = "0 11px";
-
-            if (command.trim().toLowerCase() === "whoami") {
-                result.textContent = "Atharva Dixit";}
-
-            if (command.trim().toLowerCase() === "Hostname -I") {
-                result.textContent = "Solapur, Maharashtra, India";
-                
-            } else {
-                result.textContent = `Command not found: ${command}`;
-            }
-
-            commandOutput.appendChild(result);
+            const normalizedCommand = command.trim().toLowerCase();
+            const isRegistered = Object.hasOwn(commandHandlers, normalizedCommand);
+            const result = isRegistered
+                ? commandHandlers[normalizedCommand](command)
+                : `Command not found: ${command}`;
+            renderCommandResult(commandOutput, result);
             outputDiv.appendChild(commandOutput);
         }
 
