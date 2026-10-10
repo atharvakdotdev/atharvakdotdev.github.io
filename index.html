@@ -59,6 +59,7 @@
             flex: 1;
             min-height: 0;
             overflow-y: auto;
+            padding-left: 4px;
         }
 
         .terminal-input-row {
@@ -70,7 +71,6 @@
             display: flex;
             align-items: center;
             gap: 0;
-            font-family: "Press Start 2P", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
             position: relative;
             overflow: hidden;
         }
@@ -86,18 +86,26 @@
             box-shadow: 0 0 8px rgba(77, 215, 255, 0.9);
         }
 
+        .prompt-prefix {
+            margin-right: 8px;
+            color: #5ef0bd;
+            font-weight: 700;
+            font-size: 1.15rem;
+            line-height: 1;
+        }
+
         .terminal-input-row .prompt-prefix {
-            color: #53f7c7;
+            color: #5ef0bd;
             font-weight: 700;
             margin-right: 8px;
-            font-size: 0.85rem;
-            line-height: 1.4;
+            font-size: 1.15rem;
+            line-height: 1;
         }
 
         .terminal-input-row .has-text-primary {
             color: #7ee7ff;
             font-weight: 500;
-            font-size: 0.7rem;
+            font-size: 1rem;
             line-height: 1.4;
             white-space: nowrap;
         }
@@ -106,9 +114,8 @@
             background: transparent;
             border: none;
             outline: none;
-            color: #dbf8ff;
-            font-family: "Press Start 2P", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-            font-size: 0.7rem;
+            color: #dffcff;
+            font-size: 1rem;
             line-height: 1.4;
             padding: 0 0 0 2px;
             width: 100%;
@@ -123,6 +130,15 @@
 
         #terminal_sidebar {
             max-width: 25%;
+        }
+        .input {
+            font-size: 1rem;
+            padding: 0px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem !important;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -154,21 +170,21 @@
             "hostname -i": () => "Solapur, Maharashtra, India"
         };
 
-        function createTextOutput(text) {
+        function createTextOutput(text, isSuccess) {
             const output = document.createElement("p");
-            output.className = "subtitle is-6 mb-3";
+            output.className = `subtitle is-6 mb-3 ${isSuccess ? "has-text-success" : "has-text-danger"}`;
             output.style.margin = "0 0px";
             output.textContent = text;
             return output;
         }
 
-        function renderCommandResult(container, result) {
+        function renderCommandResult(container, result, isSuccess) {
             if (result == null) return;
 
             const outputs = Array.isArray(result) ? result : [result];
             outputs.forEach((output) => {
                 if (typeof output === "string") {
-                    container.appendChild(createTextOutput(output));
+                    container.appendChild(createTextOutput(output, isSuccess));
                 } else if (output instanceof Node) {
                     container.appendChild(output);
                 }
@@ -177,17 +193,24 @@
 
         function runCommand(terminal, command) {
             const commandOutput = document.createElement("div");
+            const arrow = document.createElement("span");
+            arrow.className = "prompt-prefix";
+            arrow.textContent = "→";
+
             const enteredCommand = document.createElement("span");
             enteredCommand.className = "input";
             enteredCommand.textContent = command;
+
+            commandOutput.appendChild(arrow);
             commandOutput.appendChild(enteredCommand);
 
             const normalizedCommand = command.trim().toLowerCase();
             const isRegistered = Object.hasOwn(commandHandlers, normalizedCommand);
-            const result = isRegistered
+            const isSuccess = isRegistered;
+            const result = isSuccess
                 ? commandHandlers[normalizedCommand](command)
                 : `Command not found: ${command}`;
-            renderCommandResult(commandOutput, result);
+            renderCommandResult(commandOutput, result, isSuccess);
             const terminalOutput = terminal.querySelector(".terminal-output");
             terminalOutput.appendChild(commandOutput);
             terminalOutput.scrollTop = terminalOutput.scrollHeight;
