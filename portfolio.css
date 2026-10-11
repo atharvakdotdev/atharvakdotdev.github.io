@@ -392,7 +392,11 @@ body {
     .window-title {
         left: auto;
         right: 12px;
+        max-width: calc(100% - 76px);
         transform: none;
+        overflow: hidden;
+        text-align: right;
+        text-overflow: ellipsis;
     }
 }
 
