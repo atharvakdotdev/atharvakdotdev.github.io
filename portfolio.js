@@ -7,11 +7,16 @@
     if (!terminalOutput || !input) return;
 
     const page = document.body.dataset.page;
-    const projects = [
-        { slug: "project-one", name: "Project 1" },
-        { slug: "project-two", name: "Project 2" },
-        { slug: "project-three", name: "Project 3" },
-    ];
+    let userHasInteracted = false;
+    const githubUsername = "atharvakdotdev";
+    const requestedRepositoryName = new URLSearchParams(window.location.search).get("repo");
+    const repositoryCacheKey = `portfolio.repos.v3.${githubUsername}`;
+    const repositoryCacheDuration = 60 * 1000;
+    const markdownLibraryLoads = new Map();
+    let repositories = [];
+    let selectedRepository = null;
+    let repositoryLoadError = null;
+    let markdownLibrariesPromise = null;
 
     function createTextOutput(text, isSuccess) {
         const isHtmlOutput = /<\s*(div|a|strong|span)[^>]*>/i.test(text);
@@ -52,6 +57,9 @@
     function createCommandBlock(command) {
         const block = document.createElement("div");
         block.className = "command-block";
+        if (["ls projects/", "projects"].includes(command.trim().toLowerCase())) {
+            block.classList.add("project-list-command");
+        }
 
         const arrow = document.createElement("span");
         arrow.className = "prompt-prefix";
@@ -67,7 +75,207 @@
     }
 
     function scrollToLatestOutput() {
+        if (!userHasInteracted) return;
         terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    }
+
+    const allowOutputAutoscroll = () => {
+        userHasInteracted = true;
+    };
+    document.addEventListener("pointerdown", allowOutputAutoscroll, { once: true });
+    document.addEventListener("touchstart", allowOutputAutoscroll, { once: true, passive: true });
+    document.addEventListener("wheel", allowOutputAutoscroll, { once: true, passive: true });
+    document.addEventListener("keydown", allowOutputAutoscroll, { once: true });
+    document.addEventListener("input", allowOutputAutoscroll, { once: true });
+
+    function hasProjectTopic(repository) {
+        return repository.topics?.some((topic) =>
+            typeof topic === "string" && topic.toLowerCase().includes("project")
+        ) ?? false;
+    }
+
+    async function fetchRepositories() {
+        try {
+            const cached = JSON.parse(sessionStorage.getItem(repositoryCacheKey));
+            if (cached && Date.now() - cached.savedAt < repositoryCacheDuration && Array.isArray(cached.repositories)) {
+                return cached.repositories.filter(hasProjectTopic);
+            }
+        } catch {
+            // Storage can be unavailable for local files or private browsing.
+        }
+
+        const allRepositories = [];
+        for (let pageNumber = 1; ; pageNumber += 1) {
+            const url = new URL(`https://api.github.com/users/${githubUsername}/repos`);
+            url.search = new URLSearchParams({
+                type: "owner",
+                sort: "updated",
+                per_page: "100",
+                page: String(pageNumber),
+            });
+            const response = await fetch(url, {
+                headers: { Accept: "application/vnd.github+json" },
+            });
+            if (!response.ok) {
+                throw new Error(`GitHub returned ${response.status}`);
+            }
+
+            const batch = await response.json();
+            if (!Array.isArray(batch)) {
+                throw new Error("GitHub returned an unexpected repository list");
+            }
+            allRepositories.push(...batch);
+            if (batch.length < 100) break;
+        }
+
+        const ownedRepositories = allRepositories.filter((repository) =>
+            !repository.fork && repository.owner?.login?.toLowerCase() === githubUsername.toLowerCase()
+        );
+        try {
+            sessionStorage.setItem(repositoryCacheKey, JSON.stringify({
+                savedAt: Date.now(),
+                repositories: ownedRepositories,
+            }));
+        } catch {
+            // The live repository list remains usable without a cache.
+        }
+        return ownedRepositories.filter(hasProjectTopic);
+    }
+
+    const repositoriesReady = fetchRepositories()
+        .then((loadedRepositories) => {
+            repositories = loadedRepositories;
+            selectedRepository = repositories.find((repository) =>
+                repository.name.toLowerCase() === requestedRepositoryName?.toLowerCase()
+            ) ?? null;
+            if (selectedRepository) {
+                terminal.querySelector(".window-title").textContent = `atharvak@dev: ~/projects/${selectedRepository.name}`;
+                document.title = `Atharva | ${selectedRepository.name}`;
+            }
+            return repositories;
+        })
+        .catch((error) => {
+            repositoryLoadError = error;
+            return [];
+        });
+
+    function createMessage(text) {
+        const message = document.createElement("p");
+        message.className = "subtitle is-6";
+        message.textContent = text;
+        return message;
+    }
+
+    function repositoryPageUrl(repository) {
+        const query = `?repo=${encodeURIComponent(repository.name)}`;
+        if (page === "home") return `projects/index.html${query}`;
+        if (page === "project") return `index.html${query}`;
+        return `index.html${query}`;
+    }
+
+    function createRepositoryList() {
+        if (repositoryLoadError) {
+            return createMessage(`Could not load GitHub repositories: ${repositoryLoadError.message}. Try again later.`);
+        }
+
+        const container = document.createElement("div");
+        const heading = document.createElement("strong");
+        heading.textContent = `Projects (${repositories.length}):`;
+        container.appendChild(heading);
+
+        const list = document.createElement("div");
+        list.className = "project-list";
+        repositories.forEach((repository) => {
+            const link = document.createElement("a");
+            link.href = repositoryPageUrl(repository);
+            link.textContent = `${repository.name}/`;
+            list.appendChild(link);
+        });
+        container.appendChild(list);
+        return container;
+    }
+
+    function createRepositoryDetails(repository) {
+        const details = document.createElement("div");
+        const heading = document.createElement("strong");
+        heading.textContent = repository.name;
+        details.appendChild(heading);
+
+        const summary = createMessage(repository.description || "No description provided.");
+        details.appendChild(summary);
+        if (repository.language) {
+            details.appendChild(createMessage(`Primary language: ${repository.language}`));
+        }
+
+        const repositoryLink = document.createElement("a");
+        repositoryLink.href = repository.html_url;
+        repositoryLink.target = "_blank";
+        repositoryLink.rel = "noreferrer";
+        repositoryLink.textContent = "Open repository on GitHub";
+        details.appendChild(repositoryLink);
+        return details;
+    }
+
+    async function showRepositoryReadme() {
+        const response = await fetch(`https://api.github.com/repos/${selectedRepository.full_name}/readme`, {
+            headers: { Accept: "application/vnd.github+json" },
+        });
+        if (response.status === 404) {
+            return createMessage(`No README.md found in ${selectedRepository.name}.`);
+        }
+        if (!response.ok) {
+            throw new Error(`GitHub returned ${response.status} while loading the README`);
+        }
+
+        const readme = await response.json();
+        const binary = atob(readme.content.replace(/\s/g, ""));
+        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+        const markdown = new TextDecoder().decode(bytes);
+        const [markdownParser, sanitizer] = await loadMarkdownLibraries();
+        const readmeContent = document.createElement("div");
+        readmeContent.className = "repo-readme";
+        const renderedMarkdown = markdownParser.parse(markdown, { gfm: true });
+        readmeContent.innerHTML = sanitizer.sanitize(renderedMarkdown, { USE_PROFILES: { html: true } });
+
+        const content = createRepositoryDetails(selectedRepository);
+        content.appendChild(readmeContent);
+        return content;
+    }
+
+    function loadMarkdownLibrary(url, globalName) {
+        if (window[globalName]) return Promise.resolve(window[globalName]);
+        if (markdownLibraryLoads.has(globalName)) return markdownLibraryLoads.get(globalName);
+
+        const libraryPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = url;
+            script.async = true;
+            script.onload = () => {
+                if (window[globalName]) {
+                    resolve(window[globalName]);
+                } else {
+                    reject(new Error(`Could not initialize ${globalName}`));
+                }
+            };
+            script.onerror = () => reject(new Error(`Could not load ${globalName}`));
+            document.head.appendChild(script);
+        }).catch((error) => {
+            markdownLibraryLoads.delete(globalName);
+            throw error;
+        });
+
+        markdownLibraryLoads.set(globalName, libraryPromise);
+        return libraryPromise;
+    }
+
+    function loadMarkdownLibraries() {
+        if (!markdownLibrariesPromise) {
+            markdownLibrariesPromise = Promise.all([
+                loadMarkdownLibrary("https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js", "marked"),
+                loadMarkdownLibrary("https://cdn.jsdelivr.net/npm/dompurify@3.3.1/dist/purify.min.js", "DOMPurify"),
+            ]);
+        }
+        return markdownLibrariesPromise;
     }
 
     const homeCommands = {
@@ -89,14 +297,10 @@
                 </div>
             </div>
         `,
-        "ls projects/": () => `
-            <div>
-                <strong>Projects:</strong>
-                <div class="social-links">
-                    ${projects.map((project) => `<a href="projects/${project.slug}.html">/${project.name.replaceAll(" ", "")}</a>`).join("")}
-                </div>
-            </div>
-        `,
+        "ls projects/": async () => {
+            await repositoriesReady;
+            return createRepositoryList();
+        },
         "git pull": () => `<div class="github-graph">
             <div class="github-graph-label">Contributions in the last year</div>
             <img src="https://ghchart.rshah.org/0495b6/atharvakdotdev" alt="GitHub contribution activity over the last year" />
@@ -109,16 +313,6 @@
             </div>
         </div>`,
     };
-
-    function showProjects() {
-        const projectPath = page === "home" ? "projects/" : "";
-        return `<div>
-            <strong>Projects:</strong>
-            <div class="social-links">
-                ${projects.map((project) => `<a href="${projectPath}${project.slug}.html">/${project.name.replaceAll(" ", "")}</a>`).join("")}
-            </div>
-        </div>`;
-    }
 
     function showProjectDetails() {
         return `<div>
@@ -138,7 +332,9 @@
             return null;
         },
         "cd ..": () => {
-            if (page === "project") {
+            if (page === "projects" && requestedRepositoryName) {
+                window.location.href = "index.html";
+            } else if (page === "project") {
                 window.location.href = "index.html";
             } else if (page === "projects") {
                 window.location.href = "../index.html";
@@ -148,20 +344,36 @@
         "cd projects/": () => {
             if (page === "home") {
                 window.location.href = "projects/index.html";
-            } else if (page === "project") {
+            } else if (page === "project" || requestedRepositoryName) {
                 window.location.href = "index.html";
             }
             return null;
         },
-        "help": () => "Commands: whoami, hostname -i, curl atharvak.dev, ls projects/, git pull, cat README.md, cd projects/, cd .., home, clear, help",
+        "help": () => "Commands: whoami, hostname -i, curl atharvak.dev, ls projects/, git pull, cat README.md, cd projects/, cd <repository-name>/, cd .., home, clear, help. Projects must have a GitHub topic containing 'project'.",
     };
 
     const projectCommands = {
-        "projects": showProjects,
-        "ls projects/": showProjects,
-        "cat readme.md": () => page === "project"
-            ? showProjectDetails()
-            : "Choose a project with ls projects/.",
+        "projects": async () => {
+            await repositoriesReady;
+            return createRepositoryList();
+        },
+        "ls projects/": async () => {
+            await repositoriesReady;
+            return createRepositoryList();
+        },
+        "cat readme.md": async () => {
+            await repositoriesReady;
+            if (selectedRepository) {
+                try {
+                    return await showRepositoryReadme();
+                } catch (error) {
+                    return createMessage(`Could not load README.md: ${error.message}`);
+                }
+            }
+            return page === "project"
+                ? showProjectDetails()
+                : createMessage("Choose a repository with ls projects/.");
+        },
     };
 
     const commandHandlers = {
@@ -177,10 +389,26 @@
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 300));
 
-        const isRegistered = Object.hasOwn(commandHandlers, command);
-        const result = isRegistered
-            ? commandHandlers[command](rawCommand)
-            : `Command not found: ${rawCommand}`;
+        let isRegistered = Object.hasOwn(commandHandlers, command);
+        let result;
+        if (isRegistered) {
+            result = await commandHandlers[command](rawCommand);
+        } else if (/^cd\s+.+\/$/.test(command)) {
+            await repositoriesReady;
+            const repositoryName = command.slice(3, -1).trim();
+            const repository = repositories.find((candidate) =>
+                candidate.name.toLowerCase() === repositoryName.toLowerCase()
+            );
+            if (repository) {
+                window.location.href = repositoryPageUrl(repository);
+            } else {
+                isRegistered = false;
+                result = `Repository not found: ${repositoryName}/. Use ls projects/ to see available repositories.`;
+            }
+        } else {
+            isRegistered = false;
+            result = `Command not found: ${rawCommand}`;
+        }
         renderCommandResult(block, result, isRegistered);
         scrollToLatestOutput();
     }
@@ -234,6 +462,16 @@
             }
         })();
     } else {
-        executeCommand(page === "project" ? "cat README.md" : "ls projects/");
+        repositoriesReady.then(() => {
+            if (page === "projects" && requestedRepositoryName) {
+                if (selectedRepository) {
+                    executeCommand("cat README.md");
+                } else {
+                    executeCommand(`cd ${requestedRepositoryName}/`);
+                }
+            } else {
+                executeCommand(page === "project" ? "cat README.md" : "ls projects/");
+            }
+        });
     }
 })();

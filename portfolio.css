@@ -159,14 +159,15 @@ body {
 }
 
 .terminal-output > .command-block {
-    max-width: 75ch;
     margin: 0 0 1.1rem;
 }
 
 .terminal-output > .command-block:last-child { margin-bottom: 0; }
 
+.terminal-output > .project-list-command { max-width: none; }
+
 .command-name {
-    color: var(--command-cyan);
+    color: var(--terminal-fg);
     font-size: 1.05rem;
     font-weight: 600;
 }
@@ -278,22 +279,102 @@ body {
 .github-legend-swatches span:nth-child(5) { background: #48c5e2; }
 
 .project-list {
-    display: grid;
-    gap: 0.35rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 1rem;
     margin-top: 0.45rem;
 }
 
 .project-list a {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.8rem;
-    align-items: baseline;
-    width: fit-content;
+    display: inline;
+    width: auto;
 }
 
 .project-list small {
     color: #a3b1c2;
     font-size: 0.78rem;
+}
+
+.repo-readme {
+    max-width: 75ch;
+    margin: 0.75rem 0 0;
+    color: var(--intro-text);
+    font-size: 0.9rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.repo-readme > * {
+    margin: 0 0 0.8rem;
+}
+
+.repo-readme > :last-child {
+    margin-bottom: 0;
+}
+
+.repo-readme h1,
+.repo-readme h2,
+.repo-readme h3,
+.repo-readme h4,
+.repo-readme h5,
+.repo-readme h6 {
+    color: var(--bright-green);
+    overflow-wrap: anywhere;
+}
+
+.repo-readme h1 { font-size: 1.4rem; }
+.repo-readme h2 { font-size: 1.2rem; }
+.repo-readme h3 { font-size: 1.05rem; }
+
+.repo-readme pre {
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--surface);
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+.repo-readme code {
+    color: var(--command-cyan);
+    font-family: inherit;
+}
+
+.repo-readme :not(pre) > code {
+    padding: 0.05rem 0.25rem;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.repo-readme blockquote {
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--primary);
+    color: #a3b1c2;
+}
+
+.repo-readme ul,
+.repo-readme ol {
+    padding-left: 1.4rem;
+}
+
+.repo-readme table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+.repo-readme th,
+.repo-readme td {
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+
+.repo-readme img {
+    max-width: 100%;
+    height: auto;
 }
 
 @media (max-width: 600px) {
