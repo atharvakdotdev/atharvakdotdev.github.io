@@ -16,12 +16,12 @@
     <style>
         body {
             display: flex;
-            padding-left: 10px;
-            padding-right: 10px;
+            padding-left: 5px;
+            padding-right: 5px;
 
             /* 1. Default for Mobile: Stack items vertically */
             flex-direction: column;
-            gap: 10px;
+            gap: 5px;
             min-height: 100vh;
             margin: 0;
         }
@@ -35,8 +35,8 @@
         }
 
         .terminal {
-            margin-top: 10px;
-            margin-bottom: 10px;
+            margin-top: 5px;
+            margin-bottom: 5px;
             padding-top: 4px;
             padding-left: 4px;
             box-sizing: border-box;
@@ -90,7 +90,7 @@
             margin-right: 8px;
             color: #5ef0bd;
             font-weight: 700;
-            font-size: 1.15rem;
+            font-size: 0.95rem;
             line-height: 1;
         }
 
@@ -98,14 +98,14 @@
             color: #5ef0bd;
             font-weight: 700;
             margin-right: 8px;
-            font-size: 1.15rem;
+            font-size: 0.95rem;
             line-height: 1;
         }
 
         .terminal-input-row .has-text-primary {
             color: #7ee7ff;
             font-weight: 500;
-            font-size: 1rem;
+            font-size: 0.9rem;
             line-height: 1.4;
             white-space: nowrap;
         }
@@ -115,7 +115,7 @@
             border: none;
             outline: none;
             color: #dffcff;
-            font-size: 1rem;
+            font-size: 0.9rem;
             line-height: 1.4;
             padding: 0 0 0 2px;
             width: 100%;
@@ -131,19 +131,88 @@
         #terminal_sidebar {
             max-width: 25%;
         }
+
         .input {
             font-size: 1rem;
             padding: 0px;
         }
 
         .subtitle {
-            font-size: 1.1rem !important;
-            line-height: 1.5;
+            font-size: 0.95rem !important;
+            line-height: 1.1;
+        }
+
+        .terminal-output p {
+            white-space: pre-wrap;
+            line-height: 1.4;
+            margin: 0 0 0.8rem 0;
+            font-size: 0.95rem;
+        }
+
+        .terminal-output>div {
+            margin: 0 0 0.8rem 0;
+        }
+
+        .terminal-output strong {
+            color: #5ef0bd;
+            font-weight: 700;
+        }
+
+        .terminal-output a {
+            color: #8be9fd;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            word-break: break-word;
+        }
+
+        .terminal-output a:hover {
+            color: #5ef0bd;
+        }
+
+        .terminal-output .social-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            align-items: center;
+            margin-top: 0.2rem;
+        }
+
+        .terminal-output .social-links a {
+            white-space: nowrap;
+        }
+
+        .terminal-output .terminal-heading {
+            color: #8be9fd;
+            font-weight: 700;
+            margin-bottom: 0.6rem;
+        }
+
+        .github-graph {
+            background: #0f111a;
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 8px;
+            max-width: 70%;
+        }
+
+        .github-graph img {
+            width: 100%;
+            display: block;
+            filter: url(#github-graph-theme);
         }
     </style>
 </head>
 
 <body class="body">
+    <svg aria-hidden="true" focusable="false" style="position: absolute; width: 0; height: 0; overflow: hidden">
+        <filter id="github-graph-theme" color-interpolation-filters="sRGB">
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0.12 0 0 0 0 0.13 0 0 0 0 0.16 1 0 0 0 0" result="emptyCells" />
+            <feComponentTransfer in="emptyCells" result="darkEmptyCells">
+                <feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 1" />
+            </feComponentTransfer>
+            <feComposite in="darkEmptyCells" in2="SourceGraphic" operator="over" />
+        </filter>
+    </svg>
     <div id="terminal_sidebar" class="terminal">
         <div class="terminal-output"></div>
         <div class="control terminal-input-row">
@@ -166,15 +235,56 @@
 
 
         const commandHandlers = {
-            "whoami": () => "Atharva Dixit",
-            "hostname -i": () => "Solapur, Maharashtra, India"
+            "whoami": () => `Hey, I’m **Atharva** 18, he/him — I like turning ideas into working software and exploring what technology can do.I’m interested in **software development**, **AI**, and **Brain-Computer Interfaces** (BCIs). Currently building projects, experimenting with new ideas, and learning by shipping things that solve real problems.
+
+            Always curious about what I can build next.
+`,
+            "hostname -i": () => "Solapur, Maharashtra, India",
+            "curl atharvak.dev": () => `
+                <div>
+                    <strong>Links:</strong>
+                    <div class="social-links">
+                        <a href="https://github.com/atharvakdotdev" target="_blank" rel="noreferrer">/GitHub</a>
+                        <a href="https://www.linkedin.com/in/atharva-dixit-28a5ab320/" target="_blank" rel="noreferrer">/LinkedIn</a>
+                        <a href="https://www.instagram.com/atharvak.dev/" target="_blank" rel="noreferrer">/Instagram</a>
+                        <a href="mailto:hello@atharvak.dev">Email</a>
+                    </div>
+                </div>
+            `,
+            "ls projects/": () => `
+                <div>
+                    <strong>Projects:</strong>
+                    <div class="social-links">
+                        <a href="" target="_blank" rel="noreferrer">/Project1</a>
+                        <a href="" target="_blank" rel="noreferrer">/Project2</a>
+                        <a href="" target="_blank" rel="noreferrer">/Project3</a>
+                    </div>
+                </div>
+            `,
+            "git pull": () => `<div class="github-graph">
+    <img src="https://ghchart.rshah.org/0495b6/atharvakdotdev" alt="GitHub activity" />
+</div>
+                    `
         };
 
         function createTextOutput(text, isSuccess) {
-            const output = document.createElement("p");
+            const isHtmlOutput = /<\s*(div|a|strong|span)[^>]*>/i.test(text);
+            const output = document.createElement(isHtmlOutput ? "div" : "p");
             output.className = `subtitle is-6 mb-3 ${isSuccess ? "has-text-success" : "has-text-danger"}`;
             output.style.margin = "0 0px";
-            output.textContent = text;
+
+            const formatted = text
+                .split(/\n\s*\n/)
+                .map((paragraph) => paragraph.trim())
+                .filter(Boolean)
+                .map((paragraph) => paragraph
+                    .replace(/^##\s*(.+)$/gm, '<span class="terminal-heading">$1</span>')
+                    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                    .replace(/\n/g, "<br>")
+                )
+                .join("<br><br>");
+
+            output.innerHTML = formatted;
             return output;
         }
 
