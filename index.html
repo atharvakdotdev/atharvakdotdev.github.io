@@ -14,6 +14,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
+        * {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        *::-webkit-scrollbar {
+            display: none;
+        }
+
         body {
             display: flex;
             padding-left: 5px;
@@ -40,14 +49,14 @@
             padding-top: 4px;
             padding-left: 4px;
             box-sizing: border-box;
-            height: calc(100vh - 40px);
+            height: calc(100vh - 10px);
             min-height: 220px;
             display: flex;
             flex-direction: column;
             padding-bottom: 4px;
             border-color: #8be9fd;
             border-style: solid;
-            border-width: 2px;
+            border-width: 0px;
             border-radius: 1cap;
             flex: 1;
         }
@@ -213,14 +222,14 @@
             <feComposite in="darkEmptyCells" in2="SourceGraphic" operator="over" />
         </filter>
     </svg>
-    <div id="terminal_sidebar" class="terminal">
+    <!-- <div id="terminal_sidebar" class="terminal">
         <div class="terminal-output"></div>
         <div class="control terminal-input-row">
             <span class="prompt-prefix">→</span>
             <span class="has-text-primary">atharvak@dev$</span>
             <input type="text" class="terminal-command-input" />
         </div>
-    </div>
+    </div> -->
     <div id="terminal" class="terminal">
         <div class="terminal-output"></div>
         <div class="control terminal-input-row">
@@ -323,7 +332,60 @@
             renderCommandResult(commandOutput, result, isSuccess);
             const terminalOutput = terminal.querySelector(".terminal-output");
             terminalOutput.appendChild(commandOutput);
-            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function autoRunCommands(terminal, commands)
+         {
+            const input = terminal.querySelector(".terminal-command-input");
+            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            let cancelled = false;
+            let sequenceRunning = true;
+            let isTyping = false;
+            let typedCommand = "";
+
+            const cancelSequence = () => {
+                if (!sequenceRunning) return;
+                cancelled = true;
+                sequenceRunning = false;
+                if (isTyping) input.value = input.value.slice(typedCommand.length);
+                isTyping = false;
+            };
+
+            input.addEventListener("input", cancelSequence);
+            input.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") cancelSequence();
+            }, true);
+
+            const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
+
+            async function playSequence() {
+                await wait(reducedMotion ? 0 : 1500);
+
+                for (const command of commands) {
+                    if (cancelled) return;
+
+                    isTyping = true;
+                    typedCommand = "";
+                    for (const character of command) {
+                        if (cancelled) return;
+                        typedCommand += character;
+                        input.value = typedCommand;
+                        await wait(reducedMotion ? 0 : 85);
+                    }
+
+                    isTyping = false;
+                    await wait(reducedMotion ? 0 : 250);
+                    if (cancelled) return;
+
+                    runCommand(terminal, command);
+                    input.value = "";
+                    await wait(reducedMotion ? 0 : 650);
+                }
+
+                sequenceRunning = false;
+            }
+
+            playSequence();
         }
 
         document.querySelectorAll(".terminal").forEach((terminal) => {
@@ -337,6 +399,9 @@
                 event.target.value = "";
             });
         });
+
+        // autoRunCommands(document.querySelector("#terminal_sidebar"), ["whoami", "hostname -i"]);
+        autoRunCommands(document.querySelector("#terminal"), ["whoami", "hostname -i", "curl atharvak.dev", "ls projects/", "git pull"]);
     </script>
 </body>
 
