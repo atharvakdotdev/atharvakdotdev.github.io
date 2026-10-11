@@ -381,13 +381,15 @@
         ...(page === "home" ? homeCommands : projectCommands),
     };
 
-    async function executeCommand(rawCommand) {
+    async function executeCommand(rawCommand, { instant = false } = {}) {
         const command = rawCommand.trim().toLowerCase();
         if (!command) return;
 
         const block = createCommandBlock(rawCommand);
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 300));
+        if (!instant) {
+            await new Promise((resolve) => setTimeout(resolve, reducedMotion ? 0 : 300));
+        }
 
         let isRegistered = Object.hasOwn(commandHandlers, command);
         let result;
@@ -425,6 +427,24 @@
     if (page === "home") {
         const commands = ["whoami", "hostname -i", "curl atharvak.dev", "ls projects/", "git pull"];
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const homeSequenceKey = "portfolio.homeSequenceVisited";
+        const navigationType = performance.getEntriesByType("navigation")[0]?.type;
+        let hasVisitedHome = false;
+        try {
+            hasVisitedHome = sessionStorage.getItem(homeSequenceKey) === "true";
+        } catch {
+            // The sequence can still run when session storage is unavailable.
+        }
+        const shouldAnimate = !hasVisitedHome || navigationType === "reload";
+
+        window.addEventListener("pagehide", () => {
+            try {
+                sessionStorage.setItem(homeSequenceKey, "true");
+            } catch {
+                // Returning visits fall back to the standard animation.
+            }
+        });
+
         let cancelled = false;
         let isTyping = false;
         let typedCommand = "";
@@ -440,27 +460,36 @@
             if (event.key === "Enter") cancelSequence();
         }, true);
 
-        const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
-        (async () => {
-            await wait(reducedMotion ? 0 : 1500);
-            for (const command of commands) {
-                if (cancelled) return;
-                isTyping = true;
-                typedCommand = "";
-                for (const character of command) {
-                    if (cancelled) return;
-                    typedCommand += character;
-                    input.value = typedCommand;
-                    await wait(reducedMotion ? 0 : 85);
+        if (!shouldAnimate) {
+            (async () => {
+                for (const command of commands) {
+                    await executeCommand(command, { instant: true });
                 }
-                isTyping = false;
-                await wait(reducedMotion ? 0 : 250);
-                if (cancelled) return;
-                await executeCommand(command);
                 input.value = "";
-                await wait(reducedMotion ? 0 : 650);
-            }
-        })();
+            })();
+        } else {
+            const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
+            (async () => {
+                await wait(reducedMotion ? 0 : 1500);
+                for (const command of commands) {
+                    if (cancelled) return;
+                    isTyping = true;
+                    typedCommand = "";
+                    for (const character of command) {
+                        if (cancelled) return;
+                        typedCommand += character;
+                        input.value = typedCommand;
+                        await wait(reducedMotion ? 0 : 85);
+                    }
+                    isTyping = false;
+                    await wait(reducedMotion ? 0 : 250);
+                    if (cancelled) return;
+                    await executeCommand(command);
+                    input.value = "";
+                    await wait(reducedMotion ? 0 : 650);
+                }
+            })();
+        }
     } else {
         repositoriesReady.then(() => {
             if (page === "projects" && requestedRepositoryName) {
