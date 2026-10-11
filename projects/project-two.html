@@ -1,27 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0b0e14">
     <title>Atharva | Project 2</title>
-    <link rel="stylesheet" href="../terminal.css-main/index.css">
-    <link rel="stylesheet" href="../terminal.css-main/themes/ayu-dark.css">
-    <link rel="stylesheet" href="projects.css">
+    <!-- Core Stylesheet -->
+    <link rel="stylesheet" href="../terminal.css-main/index.css" />
+    <link rel="stylesheet" href="../terminal.css-main/themes/ayu-dark.css" />
+    <link rel="stylesheet" href="../portfolio.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
-<body data-project-page="true" data-project-name="Project 2">
-    <main class="terminal" aria-label="Project 2 terminal">
+
+<body class="body" data-page="project" data-project-name="Project 2">
+    <svg aria-hidden="true" focusable="false" style="position: absolute; width: 0; height: 0; overflow: hidden">
+        <filter id="github-graph-theme" color-interpolation-filters="sRGB">
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0.19 0 0 0 0 0.21 0 0 0 0 0.25 1 0 0 0 0" result="emptyCells" />
+            <feComponentTransfer in="emptyCells" result="darkEmptyCells">
+                <feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 1" />
+            </feComponentTransfer>
+            <feComposite in="darkEmptyCells" in2="SourceGraphic" operator="over" result="withDarkEmptyCells" />
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0.60 0 0 0 0 0.66 0 0 0 0 0.73 1 0 0 0 0" result="chartLabels" />
+            <feComponentTransfer in="chartLabels" result="brightLabels">
+                <feFuncA type="discrete" tableValues="0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0" />
+            </feComponentTransfer>
+            <feComposite in="brightLabels" in2="withDarkEmptyCells" operator="over" />
+        </filter>
+    </svg>
+    <div id="terminal" class="terminal">
         <div class="terminal-header terminal-window-header">
-            <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="window-dots" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
             <span class="window-title">atharvak@dev: ~/projects/project-two</span>
         </div>
-        <div class="terminal-output" aria-live="polite"></div>
-        <div class="terminal-input-row">
-            <span class="prompt-prefix" aria-hidden="true">→</span>
-            <span class="has-text-primary terminal-user">atharvak@dev$</span>
-            <input class="terminal-command-input" type="text" aria-label="Enter a terminal command" autocomplete="off" spellcheck="false">
+        <div class="terminal-output"></div>
+        <div class="control terminal-input-row">
+            <span class="prompt-prefix">→</span>
+            <span class="has-text-primary ">atharvak@dev$</span>
+            <input type="text" class="terminal-command-input" />
         </div>
-    </main>
-    <script src="projects.js"></script>
+    </div>
+
+
+    <script src="../portfolio.js"></script>
 </body>
+
 </html>
