@@ -13,10 +13,8 @@
     const requestedRepositoryName = pageQuery.get("repo");
     const requestedVideoId = pageQuery.get("video");
     const requestedBlogSlug = pageQuery.get("post");
-    const repositoryCacheKey = `portfolio.repos.v3.${githubUsername}`;
-    const repositoryCacheDuration = 60 * 1000;
-    const blogCacheKey = `portfolio.blogs.v2.${githubUsername}`;
-    const blogCacheDuration = 60 * 1000;
+    const repositoryCacheKey = `portfolio.repos.v1.${githubUsername}`;
+    const repositoryCacheDuration = 5 * 60 * 1000;
     const markdownLibraryLoads = new Map();
     const skills = [
         { name: "Software development", detail: "Building practical software and learning by shipping projects." },
@@ -94,6 +92,12 @@
         terminalOutput.scrollTop = terminalOutput.scrollHeight;
     }
 
+    function focusTerminalInput() {
+        if (!window.matchMedia("(max-width: 600px)").matches) {
+            input.focus({ preventScroll: true });
+        }
+    }
+
     const allowOutputAutoscroll = () => {
         userHasInteracted = true;
     };
@@ -103,96 +107,94 @@
     document.addEventListener("keydown", allowOutputAutoscroll, { once: true });
     document.addEventListener("input", allowOutputAutoscroll, { once: true });
 
-    function hasProjectTopic(repository) {
-        return repository.topics?.some((topic) =>
-            typeof topic === "string" && topic.toLowerCase().includes("project")
-        ) ?? false;
-    }
-
     async function fetchRepositories() {
         try {
             const cached = JSON.parse(sessionStorage.getItem(repositoryCacheKey));
             if (cached && Date.now() - cached.savedAt < repositoryCacheDuration && Array.isArray(cached.repositories)) {
-                return cached.repositories.filter(hasProjectTopic);
+                return cached.repositories;
             }
         } catch {
             // Storage can be unavailable for local files or private browsing.
         }
 
-        const allRepositories = [];
+        const repositories = [];
         for (let pageNumber = 1; ; pageNumber += 1) {
-            const url = new URL(`https://api.github.com/users/${githubUsername}/repos`);
-            url.search = new URLSearchParams({
-                type: "owner",
+            const query = new URLSearchParams({
+                q: `user:${githubUsername} topic:project`,
                 sort: "updated",
+                order: "desc",
                 per_page: "100",
                 page: String(pageNumber),
             });
-            const response = await fetch(url, {
+            const response = await fetch(`https://api.github.com/search/repositories?${query}`, {
                 headers: { Accept: "application/vnd.github+json" },
             });
             if (!response.ok) {
-                throw new Error(`GitHub returned ${response.status}`);
+                let message = `GitHub returned ${response.status}`;
+                try {
+                    const error = await response.json();
+                    if (error.message) message = error.message;
+                } catch {
+                    // Keep the HTTP status when GitHub does not return JSON.
+                }
+                if (response.headers.get("x-ratelimit-remaining") === "0") {
+                    const resetAt = Number(response.headers.get("x-ratelimit-reset")) * 1000;
+                    const waitMinutes = Math.max(1, Math.ceil((resetAt - Date.now()) / 60000));
+                    throw new Error(`GitHub API rate limit reached. Try again in about ${waitMinutes} minutes.`);
+                }
+                throw new Error(message);
             }
 
-            const batch = await response.json();
-            if (!Array.isArray(batch)) {
-                throw new Error("GitHub returned an unexpected repository list");
+            const result = await response.json();
+            if (!Array.isArray(result.items)) {
+                throw new Error("GitHub returned an unexpected repository search result");
             }
-            allRepositories.push(...batch);
-            if (batch.length < 100) break;
+            repositories.push(...result.items.filter((repository) =>
+                repository.owner?.login?.toLowerCase() === githubUsername.toLowerCase()
+                && !repository.fork
+                && (!Array.isArray(repository.topics)
+                    || repository.topics.some((topic) => topic.toLowerCase() === "project"))
+            ));
+            if (result.items.length < 100 || repositories.length >= result.total_count) break;
         }
 
-        const ownedRepositories = allRepositories.filter((repository) =>
-            !repository.fork && repository.owner?.login?.toLowerCase() === githubUsername.toLowerCase()
-        );
         try {
             sessionStorage.setItem(repositoryCacheKey, JSON.stringify({
                 savedAt: Date.now(),
-                repositories: ownedRepositories,
+                repositories,
             }));
         } catch {
             // The live repository list remains usable without a cache.
         }
-        return ownedRepositories.filter(hasProjectTopic);
+        return repositories;
     }
 
     async function fetchBlogPosts() {
-        try {
-            const cached = JSON.parse(sessionStorage.getItem(blogCacheKey));
-            if (cached && Date.now() - cached.savedAt < blogCacheDuration && Array.isArray(cached.posts)) {
-                return cached.posts;
-            }
-        } catch {
-            // Storage can be unavailable for local files or private browsing.
-        }
-
-        const response = await fetch(`https://api.github.com/repos/${githubUsername}/${githubUsername}.github.io/contents/blogs`, {
-            headers: { Accept: "application/vnd.github+json" },
-        });
-        if (response.status === 404) {
-            throw new Error("GitHub has no published blogs/ directory yet. Push a .md file in blogs/ to publish it");
-        }
+        const blogDirectory = page === "home" ? "blogs/"
+            : page === "blogs" || page === "blog" ? ""
+                : "../blogs/";
+        const blogAssetUrl = (filename) => new URL(`${blogDirectory}${filename}`, window.location.href);
+        const response = await fetch(blogAssetUrl("posts.json"));
         if (!response.ok) {
-            throw new Error(`GitHub returned ${response.status}`);
+            throw new Error(`Could not load the local blog index (server returned ${response.status})`);
         }
 
         const files = await response.json();
         if (!Array.isArray(files)) {
-            throw new Error("GitHub returned an unexpected blog file list");
+            throw new Error("The local blog index is not a valid file list");
         }
 
         const posts = await Promise.all(files
-            .filter((file) => file.type === "file" && /\.md$/i.test(file.name) && file.download_url)
-            .map(async (file) => {
-                const markdownResponse = await fetch(file.download_url);
+            .filter((filename) => typeof filename === "string" && /^[\w -]+\.md$/i.test(filename))
+            .map(async (filename) => {
+                const markdownResponse = await fetch(blogAssetUrl(filename));
                 if (!markdownResponse.ok) {
-                    throw new Error(`Could not load ${file.name}: server returned ${markdownResponse.status}`);
+                    throw new Error(`Could not load ${filename}: server returned ${markdownResponse.status}`);
                 }
 
                 const content = await markdownResponse.text();
                 const title = content.match(/^#\s+(.+)$/m)?.[1].trim()
-                    ?? file.name.replace(/\.md$/i, "").replace(/[-_]+/g, " ");
+                    ?? filename.replace(/\.md$/i, "").replace(/[-_]+/g, " ");
                 const excerpt = content
                     .replace(/^---\s*[\r\n]+[\s\S]*?[\r\n]+---\s*/, "")
                     .replace(/```[\s\S]*?```/g, " ")
@@ -206,19 +208,14 @@
                     .slice(0, 180) ?? "";
 
                 return {
-                    slug: file.name.replace(/\.md$/i, ""),
-                    source: file.name,
+                    slug: filename.replace(/\.md$/i, ""),
+                    source: filename,
                     title,
                     excerpt,
                     content,
                 };
             }));
 
-        try {
-            sessionStorage.setItem(blogCacheKey, JSON.stringify({ savedAt: Date.now(), posts }));
-        } catch {
-            // The live post list remains usable without a cache.
-        }
         return posts;
     }
 
@@ -271,6 +268,7 @@
     }
 
     function directoryPageUrl(directory) {
+        if (directory === "home/") return homePageUrl();
         if (directory === "projects/") {
             if (page === "home") return "projects/index.html";
             if (page === "projects" || page === "project") return "index.html";
@@ -313,6 +311,106 @@
         if (page === "home") return `blogs/index.html${query}`;
         if (page === "blogs" || page === "blog") return `index.html${query}`;
         return `../blogs/index.html${query}`;
+    }
+
+    function homePageUrl() {
+        return page === "home" ? "index.html" : "../index.html";
+    }
+
+    function currentDirectorySegments() {
+        if (page === "home") return [];
+        if (page === "projects") {
+            return requestedRepositoryName ? ["projects", selectedRepository?.name ?? requestedRepositoryName] : ["projects"];
+        }
+        if (page === "project") {
+            return ["projects", document.body.dataset.projectName.toLowerCase().replace(/\s+/g, "-")];
+        }
+        if (page === "blogs") return selectedBlog ? ["blogs", selectedBlog.slug] : ["blogs"];
+        if (page === "skills") return ["skills"];
+        if (page === "video") return selectedVideo ? ["videos", selectedVideo.slug] : ["videos"];
+        if (page === "videos") return ["videos"];
+        return [];
+    }
+
+    function normalizePath(target = "") {
+        const segments = target.startsWith("/") ? [] : currentDirectorySegments();
+        target.split("/").forEach((segment) => {
+            if (!segment || segment === ".") return;
+            if (segment === "..") {
+                segments.pop();
+            } else {
+                segments.push(segment);
+            }
+        });
+        return segments;
+    }
+
+    function pageUrlForPath(segments) {
+        if (!segments.length || (segments.length === 1 && segments[0].toLowerCase() === "home")) {
+            return homePageUrl();
+        }
+        if (segments.length === 1) {
+            const directory = `${segments[0].toLowerCase()}/`;
+            return ["projects/", "skills/", "blogs/", "videos/"].includes(directory)
+                ? directoryPageUrl(directory)
+                : null;
+        }
+        if (segments.length === 2 && segments[0].toLowerCase() === "projects") {
+            const repository = repositories.find((candidate) =>
+                candidate.name.toLowerCase() === segments[1].toLowerCase()
+            );
+            return repository ? repositoryPageUrl(repository) : null;
+        }
+        if (segments.length === 2 && segments[0].toLowerCase() === "blogs") {
+            const post = blogPosts.find((candidate) =>
+                candidate.slug.toLowerCase() === segments[1].toLowerCase()
+            );
+            return post ? blogPageUrl(post) : null;
+        }
+        if (segments.length === 2 && segments[0].toLowerCase() === "videos") {
+            const video = videos.find((candidate) =>
+                candidate.slug.toLowerCase() === segments[1].toLowerCase()
+            );
+            return video ? videoPageUrl(video) : null;
+        }
+        return null;
+    }
+
+    async function listDirectory(target = "") {
+        const segments = normalizePath(target);
+        const path = segments.map((segment) => segment.toLowerCase());
+        if (!path.length || (path.length === 1 && path[0] === "home")) {
+            return createDirectoryListing((directory) => executeCommand(`cd ${directory}`));
+        }
+        if (path.length === 1 && path[0] === "projects") {
+            await repositoriesReady;
+            return createRepositoryList();
+        }
+        if (path.length === 1 && path[0] === "blogs") {
+            await blogsReady;
+            return createBlogsPage();
+        }
+        if (path.length === 1 && path[0] === "skills") return createSkillsPage();
+        if (path.length === 1 && path[0] === "videos") return createVideoGallery();
+        if (path.length === 2 && path[0] === "projects") {
+            const repository = repositories.find((candidate) => candidate.name.toLowerCase() === path[1]);
+            return repository ? createMessage("README.md") : createMessage(`No such directory: ${segments[1]}/`);
+        }
+        if (path.length === 2 && path[0] === "blogs") {
+            const post = blogPosts.find((candidate) => candidate.slug.toLowerCase() === path[1]);
+            return post ? createMessage(post.source) : createMessage(`No such directory: ${segments[1]}/`);
+        }
+        return createMessage(`No such directory: ${target || "."}`);
+    }
+
+    async function navigateToPath(target) {
+        const segments = normalizePath(target);
+        const url = pageUrlForPath(segments);
+        if (url) {
+            window.location.href = url;
+            return null;
+        }
+        return `No such directory: ${target || "."}`;
     }
 
     function createSkillsPage() {
@@ -478,7 +576,7 @@
 
         const list = document.createElement("div");
         list.className = "social-links directory-list";
-        ["skills/", "projects/", "blogs/", "videos/"].forEach((directory) => {
+        ["home/", "projects/", "skills/", "blogs/", "videos/"].forEach((directory) => {
             const link = document.createElement("a");
             link.href = directoryPageUrl(directory);
             link.textContent = directory;
@@ -514,20 +612,21 @@
     }
 
     async function showRepositoryReadme() {
-        const response = await fetch(`https://api.github.com/repos/${selectedRepository.full_name}/readme`, {
-            headers: { Accept: "application/vnd.github+json" },
-        });
-        if (response.status === 404) {
+        let markdown = "";
+        for (const filename of ["README.md", "README.MD", "readme.md", "Readme.md"]) {
+            const url = `https://raw.githubusercontent.com/${selectedRepository.full_name}/${encodeURIComponent(selectedRepository.default_branch)}/${filename}`;
+            const response = await fetch(url);
+            if (response.ok) {
+                markdown = await response.text();
+                break;
+            }
+            if (response.status !== 404) {
+                throw new Error(`Could not load README.md: server returned ${response.status}`);
+            }
+        }
+        if (!markdown) {
             return createMessage(`No README.md found in ${selectedRepository.name}.`);
         }
-        if (!response.ok) {
-            throw new Error(`GitHub returned ${response.status} while loading the README`);
-        }
-
-        const readme = await response.json();
-        const binary = atob(readme.content.replace(/\s/g, ""));
-        const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-        const markdown = new TextDecoder().decode(bytes);
         const [markdownParser, sanitizer] = await loadMarkdownLibraries();
         const readmeContent = document.createElement("div");
         readmeContent.className = "repo-readme";
@@ -594,13 +693,6 @@
                 </div>
             </div>
         `,
-        "ls": () => createDirectoryListing((directory) => executeCommand(`cd ${directory}`)),
-        "ls skills/": () => createSkillsPage(),
-        "ls videos/": () => createVideoGallery(),
-        "ls projects/": async () => {
-            await repositoriesReady;
-            return createRepositoryList();
-        },
         "git pull": () => `<div class="github-graph">
             <div class="github-graph-label">Contributions in the last year</div>
             <img src="https://ghchart.rshah.org/0495b6/atharvakdotdev" alt="GitHub contribution activity over the last year" />
@@ -628,45 +720,14 @@
             return null;
         },
         "home": () => {
-            window.location.href = page === "home" ? "index.html" : "../index.html";
+            window.location.href = homePageUrl();
             return null;
         },
-        "cd ..": () => {
-            if (page === "video" || (page === "projects" && requestedRepositoryName)) {
-                window.location.href = "index.html";
-            } else if (page === "project") {
-                window.location.href = "index.html";
-            } else if (["projects", "skills", "videos", "blogs"].includes(page)) {
-                window.location.href = "../index.html";
-            }
-            return null;
-        },
-        "cd projects/": () => {
-            window.location.href = directoryPageUrl("projects/");
-            return null;
-        },
-        "cd skills/": () => {
-            window.location.href = directoryPageUrl("skills/");
-            return null;
-        },
-        "cd blogs/": () => {
-            window.location.href = directoryPageUrl("blogs/");
-            return null;
-        },
-        "cd videos/": () => {
-            window.location.href = directoryPageUrl("videos/");
-            return null;
-        },
-        "help": () => "Commands: whoami, hostname -i, curl atharvak.dev, ls, ls projects/, git pull, cat README.md, cd skills/, cd projects/, cd blogs/, cd videos/, cd repository-name/, cd .., home, clear, help. Projects must have a GitHub topic containing 'project'.",
+        "help": () => "Commands: whoami, hostname -i, curl atharvak.dev, ls, cd <directory>/, cd .., cd home/, cat README.md, play, git pull, clear, help.",
     };
 
     const projectCommands = {
-        "ls": () => createDirectoryListing((directory) => executeCommand(`cd ${directory}`)),
         "projects": async () => {
-            await repositoriesReady;
-            return createRepositoryList();
-        },
-        "ls projects/": async () => {
             await repositoriesReady;
             return createRepositoryList();
         },
@@ -688,25 +749,21 @@
     const skillsCommands = {
         ...projectCommands,
         "skills": () => createSkillsPage(),
-        "ls skills/": () => createSkillsPage(),
     };
 
     const videosCommands = {
         ...projectCommands,
         "videos": () => createVideoGallery(),
-        "ls videos/": () => createVideoGallery(),
     };
 
     const blogsCommands = {
         ...projectCommands,
         "blogs": () => createBlogsPage(),
-        "ls blogs/": () => createBlogsPage(),
     };
 
     const videoCommands = {
         ...projectCommands,
         "play": () => createVideoDetails(),
-        "ls videos/": () => createVideoGallery(),
     };
 
     const commandHandlers = {
@@ -731,32 +788,28 @@
 
         let isRegistered = Object.hasOwn(commandHandlers, command);
         let result;
-        if (isRegistered) {
+        if (command === "ls" || command.startsWith("ls ")) {
+            result = await listDirectory(rawCommand.trim().slice(2).trim());
+            isRegistered = true;
+        } else if (/^cd(?:\s|$)/.test(command)) {
+            await Promise.all([repositoriesReady, blogsReady]);
+            result = await navigateToPath(rawCommand.trim().slice(2).trim());
+            isRegistered = result == null;
+        } else if (isRegistered) {
             result = await commandHandlers[command](rawCommand);
-        } else if (page === "blogs" && /^cat\s+[\w-]+\.md$/.test(command)) {
+        } else if (page === "blogs" && /^cat\s+[^/\\]+\.md$/.test(command)) {
             selectedBlog = blogPosts.find((post) => post.source.toLowerCase() === command.slice(4).toLowerCase()) ?? null;
             isRegistered = Boolean(selectedBlog);
             result = selectedBlog
                 ? await createBlogDetails()
                 : `Blog post not found: ${command.slice(4)} Browse available posts with ls blogs/.`;
-        } else if (/^cd\s+.+\/$/.test(command)) {
-            await repositoriesReady;
-            const repositoryName = command.slice(3, -1).trim();
-            const repository = repositories.find((candidate) =>
-                candidate.name.toLowerCase() === repositoryName.toLowerCase()
-            );
-            if (repository) {
-                window.location.href = repositoryPageUrl(repository);
-            } else {
-                isRegistered = false;
-                result = `Repository not found: ${repositoryName}/. Use ls projects/ to see available repositories.`;
-            }
         } else {
             isRegistered = false;
             result = `Command not found: ${rawCommand}`;
         }
         renderCommandResult(block, result, isRegistered);
         scrollToLatestOutput();
+        focusTerminalInput();
     }
 
     input.addEventListener("keydown", (event) => {
@@ -854,6 +907,10 @@
                 window.location.href = directoryPageUrl("projects/");
                 return;
             }
+            if (command === "cd home/") {
+                window.location.href = homePageUrl();
+                return;
+            }
             if (command === "cd skills/") {
                 window.location.href = directoryPageUrl("skills/");
                 return;
@@ -919,12 +976,15 @@
         });
 
         runSidebarCommand("ls");
+        runSidebarCommand("help");
+
     }
 
     const sidebar = document.querySelector("#terminal-sidebar");
     if (sidebar) {
         initializeSidebarTerminal(sidebar);
     }
+    focusTerminalInput();
 
     if (page === "home") {
         const commands = ["whoami", "hostname -i", "curl atharvak.dev", "ls projects/", "git pull"];
@@ -1038,18 +1098,18 @@
                     executeCommand(`cd ${requestedRepositoryName}/`);
                 }
             } else if (page === "skills") {
-                executeCommand("ls skills/");
+                executeCommand("ls");
             } else if (page === "videos") {
-                executeCommand("ls videos/");
+                executeCommand("ls");
             } else if (page === "video") {
                 executeCommand("play");
             } else if (page === "blogs") {
                 await blogsReady;
                 executeCommand(selectedBlog
                     ? `cat ${selectedBlog.source}`
-                    : requestedBlogSlug ? `cat ${requestedBlogSlug}.md` : "ls blogs/");
+                    : requestedBlogSlug ? `cat ${requestedBlogSlug}.md` : "ls");
             } else {
-                executeCommand(page === "project" ? "cat README.md" : "ls projects/");
+                executeCommand(page === "project" ? "cat README.md" : "ls");
             }
         });
     }
