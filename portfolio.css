@@ -24,6 +24,19 @@ body {
     background: var(--terminal-bg);
 }
 
+.home-workspace {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    gap: 14px;
+    width: min(100%, 1320px);
+    height: calc(100vh - 38px - env(safe-area-inset-bottom));
+}
+
+.home-workspace.sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .terminal {
     width: min(100%, 1100px);
     max-width: 1100px;
@@ -38,6 +51,90 @@ body {
     border-radius: 8px;
     background: var(--terminal-bg);
     box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32);
+}
+
+.home-workspace > .terminal {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    flex: initial;
+}
+
+.terminal-sidebar .terminal-output {
+    padding-right: 14px;
+    padding-left: 14px;
+}
+
+.terminal-sidebar .terminal-input-row {
+    padding-right: 12px;
+    padding-left: 12px;
+}
+
+.terminal-sidebar .terminal-output .directory-list {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+}
+
+.terminal-sidebar[hidden],
+.sidebar-backdrop[hidden] {
+    display: none;
+}
+
+.terminal-sidebar:not([hidden]) {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    flex: initial;
+}
+
+.sidebar-backdrop:not([hidden]) {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgba(0, 0, 0, 0.56);
+    cursor: pointer;
+}
+
+.sidebar-toggle,
+.sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--terminal-fg);
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    z-index: 1;
+    right: 8px;
+}
+
+.sidebar-toggle:hover,
+.sidebar-close:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.sidebar-close {
+    position: absolute;
+    right: 8px;
+    font-size: 1.2rem;
 }
 
 .terminal-output {
@@ -296,6 +393,91 @@ body {
     font-size: 0.78rem;
 }
 
+.skills-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 10px;
+    margin-top: 0.8rem;
+}
+
+.skill-item {
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--surface);
+}
+
+.skill-item h2 {
+    margin-bottom: 0.45rem;
+    color: var(--bright-green);
+    font-size: 1rem;
+}
+
+.skill-item .subtitle {
+    margin: 0;
+    font-size: 0.88rem !important;
+}
+
+.video-gallery > .subtitle {
+    margin-top: 0.6rem;
+}
+
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+    gap: 12px;
+    margin-top: 0.75rem;
+}
+
+.video-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--surface);
+}
+
+.video-thumbnail {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 3px;
+    background: var(--terminal-bg);
+    object-fit: cover;
+}
+
+.video-card-title {
+    color: var(--terminal-fg) !important;
+    font-size: 0.9rem !important;
+}
+
+.video-detail h1 {
+    margin-bottom: 0.7rem;
+    color: var(--bright-green);
+    font-size: 1.35rem;
+}
+
+.video-player {
+    width: 100%;
+    max-width: 75ch;
+    aspect-ratio: 16 / 9;
+    margin-top: 0.8rem;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--surface);
+}
+
+.video-player iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
 .repo-readme {
     max-width: 75ch;
     margin: 0.75rem 0 0;
@@ -387,16 +569,54 @@ body {
         min-height: min(440px, calc(100vh - 24px - env(safe-area-inset-bottom)));
     }
 
+    .home-workspace {
+        display: block;
+        height: calc(100vh - 24px - env(safe-area-inset-bottom));
+    }
+
+    .home-workspace > #terminal {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+    }
+
+    .home-workspace > .terminal-sidebar:not(.is-open) {
+        display: none;
+    }
+
+    .home-workspace > .terminal-sidebar.is-open {
+        position: fixed;
+        z-index: 31;
+        top: 8px;
+        bottom: 8px;
+        left: 8px;
+        width: min(320px, calc(100vw - 16px));
+        max-width: none;
+        height: auto;
+        min-height: 0;
+    }
+
+    .terminal-sidebar:not([hidden]) {
+        top: 8px;
+        bottom: 8px;
+        left: 8px;
+        width: min(320px, calc(100vw - 16px));
+    }
+
     .terminal-output { padding: 16px 14px 40px; }
 
     .window-title {
         left: auto;
-        right: 12px;
-        max-width: calc(100% - 76px);
+        right: 44px;
+        max-width: calc(100% - 108px);
         transform: none;
         overflow: hidden;
         text-align: right;
         text-overflow: ellipsis;
+    }
+
+    .terminal-sidebar .window-title {
+        right: 44px;
     }
 }
 

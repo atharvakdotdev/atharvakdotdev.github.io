@@ -29,28 +29,43 @@
             <feComposite in="brightLabels" in2="withDarkEmptyCells" operator="over" />
         </filter>
     </svg>
-    <!-- <div id="terminal_sidebar" class="terminal">
-        <div class="terminal-output"></div>
-        <div class="control terminal-input-row">
-            <span class="prompt-prefix">→</span>
-            <span class="has-text-primary">atharvak@dev$</span>
-            <input type="text" class="terminal-command-input" />
-        </div>
-    </div> -->
-    <div id="terminal" class="terminal">
-        <div class="terminal-header terminal-window-header">
-            <div class="window-dots" aria-hidden="true">
-                <span></span>
-                <span></span>
-                <span></span>
+    <div class="home-workspace">
+        <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close quick terminal sidebar" hidden></button>
+        <aside id="terminal-sidebar" class="terminal terminal-sidebar" aria-label="Quick terminal sidebar">
+            <div class="terminal-header terminal-window-header">
+                <div class="window-dots" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <span class="window-title">atharvak@dev: ~/quick</span>
+                <button class="sidebar-close" type="button" aria-label="Close quick terminal sidebar" title="Close sidebar">×</button>
             </div>
-            <span class="window-title">atharvak@dev: ~</span>
-        </div>
-        <div class="terminal-output"></div>
-        <div class="control terminal-input-row">
-            <span class="prompt-prefix">→</span>
-            <span class="has-text-primary ">atharvak@dev$</span>
-            <input type="text" class="terminal-command-input" />
+            <div class="terminal-output"></div>
+            <div class="control terminal-input-row">
+                <span class="prompt-prefix">→</span>
+                <span class="has-text-primary">atharvak@dev$</span>
+                <input type="text" class="terminal-command-input" aria-label="Enter a sidebar terminal command" />
+            </div>
+        </aside>
+        <div id="terminal" class="terminal">
+            <div class="terminal-header terminal-window-header">
+                <div class="window-dots" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <button class="sidebar-toggle" type="button" aria-label="Open quick terminal sidebar" aria-controls="terminal-sidebar" aria-expanded="false" title="Open sidebar">
+                    <span aria-hidden="true">☰</span>
+                </button>
+                <span class="window-title">atharvak@dev: ~</span>
+            </div>
+            <div class="terminal-output"></div>
+            <div class="control terminal-input-row">
+                <span class="prompt-prefix">→</span>
+                <span class="has-text-primary ">atharvak@dev$</span>
+                <input type="text" class="terminal-command-input" />
+            </div>
         </div>
     </div>
 
