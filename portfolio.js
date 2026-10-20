@@ -7,7 +7,7 @@
     if (!terminalOutput || !input) return;
 
     const page = document.body.dataset.page;
-    let userHasInteracted = false;
+    terminal.querySelector(".terminal-input-row .has-text-primary")?.classList.add("terminal-user");
     const githubUsername = "atharvakdotdev";
     const pageQuery = new URLSearchParams(window.location.search);
     const requestedRepositoryName = pageQuery.get("repo");
@@ -30,6 +30,7 @@
     let repositoryLoadError = null;
     let blogLoadError = null;
     let markdownLibrariesPromise = null;
+    let fastfetchInterval = null;
 
     function createTextOutput(text, isSuccess) {
         const isHtmlOutput = /<\s*(div|a|strong|span)[^>]*>/i.test(text);
@@ -70,6 +71,9 @@
     function createCommandBlock(command) {
         const block = document.createElement("div");
         block.className = "command-block";
+        if (command.trim().toLowerCase() === "fastfetch") {
+            block.classList.add("fastfetch-command");
+        }
         if (["ls projects/", "projects"].includes(command.trim().toLowerCase())) {
             block.classList.add("project-list-command");
         }
@@ -88,7 +92,6 @@
     }
 
     function scrollToLatestOutput() {
-        if (!userHasInteracted) return;
         terminalOutput.scrollTop = terminalOutput.scrollHeight;
     }
 
@@ -97,15 +100,6 @@
             input.focus({ preventScroll: true });
         }
     }
-
-    const allowOutputAutoscroll = () => {
-        userHasInteracted = true;
-    };
-    document.addEventListener("pointerdown", allowOutputAutoscroll, { once: true });
-    document.addEventListener("touchstart", allowOutputAutoscroll, { once: true, passive: true });
-    document.addEventListener("wheel", allowOutputAutoscroll, { once: true, passive: true });
-    document.addEventListener("keydown", allowOutputAutoscroll, { once: true });
-    document.addEventListener("input", allowOutputAutoscroll, { once: true });
 
     async function fetchRepositories() {
         try {
@@ -265,6 +259,95 @@
         message.className = "subtitle is-6";
         message.textContent = text;
         return message;
+    }
+
+    function formatUptime() {
+        const now = new Date();
+        let years = now.getUTCFullYear() - 2008;
+        let anniversary = Date.UTC(2008 + years, 4, 12);
+        if (anniversary > now.getTime()) {
+            years -= 1;
+            anniversary = Date.UTC(2008 + years, 4, 12);
+        }
+
+        let months = (now.getUTCFullYear() - (2008 + years)) * 12 + now.getUTCMonth() - 4;
+        if (now.getUTCDate() < 12) months -= 1;
+        anniversary = Date.UTC(2008 + years, 4 + months, 12);
+
+        let remainingSeconds = Math.floor((now.getTime() - anniversary) / 1000);
+        const days = Math.floor(remainingSeconds / 86400);
+        remainingSeconds %= 86400;
+        const hours = Math.floor(remainingSeconds / 3600);
+        remainingSeconds %= 3600;
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+        return `${years} years ${months} months ${days} days ${hours} hours ${minutes} minutes ${seconds} seconds`;
+    }
+
+    async function createFastfetchOutput() {
+        await repositoriesReady;
+        if (fastfetchInterval) window.clearInterval(fastfetchInterval);
+
+        const output = document.createElement("section");
+        output.className = "fastfetch-output";
+
+        const profilePicture = document.createElement("div");
+        profilePicture.className = "fastfetch-picture";
+
+        const asciiPicture = document.createElement("img");
+        asciiPicture.className = "fastfetch-image fastfetch-ascii";
+        asciiPicture.src = page === "home" ? "static/image.png" : "../static/image.png";
+        asciiPicture.alt = "";
+        const realPicture = document.createElement("img");
+        realPicture.className = "fastfetch-image fastfetch-real";
+        realPicture.src = page === "home" ? "static/pfp.png" : "../static/pfp.png";
+        realPicture.alt = "Profile picture";
+        profilePicture.append(asciiPicture, realPicture);
+
+        const details = document.createElement("div");
+        details.className = "fastfetch-details";
+        const fields = [
+            ["User", "Atharva Dixit"],
+            ["Uptime", ""],
+            ["Projects", `(${repositories.length})`],
+            ["Skills", String(skills.length)],
+            ["IP", "Solapur, Maharashtra"],
+            ["Education", "FY BTech CSE"],
+        ];
+        const uptimeValue = document.createElement("span");
+        uptimeValue.className = "fastfetch-value";
+
+        fields.forEach(([label, value]) => {
+            const row = document.createElement("div");
+            row.className = "fastfetch-field";
+            const fieldLabel = document.createElement("span");
+            fieldLabel.className = "fastfetch-label";
+            fieldLabel.textContent = `${label}:`;
+            const fieldValue = label === "Uptime" ? uptimeValue : document.createElement("span");
+            fieldValue.classList.add("fastfetch-value");
+            fieldValue.textContent = label === "Uptime" ? formatUptime() : value;
+            row.append(fieldLabel, fieldValue);
+            details.appendChild(row);
+        });
+
+        const colorBlocks = document.createElement("div");
+        colorBlocks.className = "fastfetch-color-blocks";
+        colorBlocks.setAttribute("aria-hidden", "true");
+        ["#20242b", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#d9d7ce"]
+            .forEach((color) => {
+                const block = document.createElement("span");
+                block.style.backgroundColor = color;
+                colorBlocks.appendChild(block);
+            });
+
+        const info = document.createElement("div");
+        info.className = "fastfetch-info";
+        info.append(details, colorBlocks);
+        output.append(profilePicture, info);
+        fastfetchInterval = window.setInterval(() => {
+            uptimeValue.textContent = formatUptime();
+        }, 1000);
+        return output;
     }
 
     function directoryPageUrl(directory) {
@@ -675,6 +758,7 @@
     }
 
     const homeCommands = {
+        "fastfetch": () => createFastfetchOutput(),
         "whoami": () => `<div class="intro-text">
             <h1 class="intro-name">Atharva</h1>
             <p>18, he/him. I like turning ideas into working software and exploring what technology can do. I’m interested in <strong>software development</strong>, <strong>AI</strong>, and <strong>Brain-Computer Interfaces</strong> (BCIs).</p>
@@ -717,13 +801,15 @@
     const sharedCommands = {
         "clear": () => {
             terminalOutput.replaceChildren();
+            if (fastfetchInterval) window.clearInterval(fastfetchInterval);
+            fastfetchInterval = null;
             return null;
         },
         "home": () => {
             window.location.href = homePageUrl();
             return null;
         },
-        "help": () => "Commands: whoami, hostname -i, curl atharvak.dev, ls, cd <directory>/, cd .., cd home/, cat README.md, play, git pull, clear, help.",
+        "help": () => "Commands: fastfetch, whoami, hostname -i, curl atharvak.dev, ls, cd <directory>/, cd .., cd home/, cat README.md, play, git pull, clear, help.",
     };
 
     const projectCommands = {
@@ -987,7 +1073,7 @@
     focusTerminalInput();
 
     if (page === "home") {
-        const commands = ["whoami", "hostname -i", "curl atharvak.dev", "ls projects/", "git pull"];
+        const commands = ["fastfetch", "whoami", "hostname -i", "curl atharvak.dev", "ls projects/", "git pull"];
         const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const typingAudio = new Audio("static/virtualzero-keyboard-typing-fast-371229.mp3");
         typingAudio.preload = "auto";
