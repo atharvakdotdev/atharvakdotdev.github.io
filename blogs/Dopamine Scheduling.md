@@ -132,7 +132,6 @@ You may also find yourself less likely to avoid taking other actions, such as he
 There are two receptors: D1, which promotes Go, and D2, which suppresses Go and promotes No-Go.
 
 **Dopamine boosts Go signaling and dampens No-Go signaling**
-
 ## Sources
 
 - [Huberman Lab — Tools to Manage Dopamine and Improve Motivation & Drive](https://www.hubermanlab.com/newsletter/tools-to-manage-dopamine-and-improve-motivation-and-drive)
